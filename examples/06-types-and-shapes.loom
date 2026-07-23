@@ -1,0 +1,52 @@
+# THE VISUAL VOCABULARY
+#
+# SHOWS: all seven types, all eight shapes, and advisory typing.
+#
+# Every type has a colour, an icon, a default shape, and named slots. Notice
+# that `character -> location` connects but draws DASHED and counts as a
+# mismatch in the status bar. It is allowed. In a narrative graph the wrong
+# edge is often the interesting one.
+#
+# Try the palette dropdown. Try overriding a shape in the inspector.
+
+palette contrast
+
+node act1     "Act One"           type:scene
+node cellar   "The Cellar"        type:location
+node borlu    "Borlu"             type:character
+node poem     "Ascent of Prometheus" type:lore
+     frag:"a subtraction that was never anywhere"
+node pen      "The Red Pen"       type:object
+node nightmare "The Same Corridor" type:dream
+     frag:"the doors were not where you left them"
+node todo     "check the ledger dates" type:note
+
+# shape overrides — same type, different shape
+node fork     "A Decision"        type:scene shape:diamond
+node coin     "A Token"           type:scene shape:circle
+node banner   "A Proclamation"    type:scene shape:slab
+
+# sensible connections
+act1   -> cellar    : go down
+cellar -> act1      : back up the stairs
+pen    -> act1      : carry it with you
+poem   -> act1      : informs
+borlu  -> act1      : appears in
+act1   -> nightmare : sleep
+nightmare -> act1   : wake
+
+# structure demo
+act1 -> fork   : reach the choice
+fork -> coin   : take the token
+fork -> banner : read the notice
+coin   -> act1 : back
+banner -> act1 : back
+
+# DELIBERATELY WRONG — character into location. dashed, counted, permitted.
+# this is the ONLY mismatch in the file. everything else fits.
+borlu -> cellar : follow him down
+
+# an object feeding a scene, which the type system likes
+pen -> nightmare : it turns up in the dream
+
+todo -> act1 : (a note, never rendered)

@@ -1,0 +1,50 @@
+# THE SHAPE BEFORE THE STORY
+#
+# SHOWS: empty nodes and requirements. Not one of these nodes is described.
+# Every single one was created by an edge pointing at a name.
+#
+# The structure is complete. The content is entirely absent. Open the lexicon
+# tab: everything is undescribed, and every requirement is open. That list is
+# a to-do list the graph computed for you.
+#
+# This is what a template is — topologically finished, semantically empty.
+
+palette cold
+
+let protagonist =
+let mentor      =
+let the_gift    =
+
+# nothing below is declared. all of it exists.
+
+ordinary_world -> call_to_adventure : something arrives
+     ! must disturb {{protagonist}}
+     ! must be refusable
+
+call_to_adventure -> refusal   : decline it
+     ! must cost nothing yet
+
+refusal           -> meeting   : encounter {{mentor}}
+     ! must know more than {{protagonist}}
+     ! must not explain everything
+
+meeting           => threshold : cross over
+     ! must be irreversible
+     ! must leave the ordinary world unreachable
+
+threshold -> trial   : the first real test
+     ! must be survivable
+     ! must not be won cleanly
+
+trial     -> reward  : obtain {{the_gift}}
+     ! must be a thing, not a feeling
+     ! must have been present earlier, unremarked
+
+reward    -> road_back : turn around
+     ! must be harder than the way in
+
+road_back -> return  : arrive changed
+     ! must be the same place
+     ! must not feel like the same place
+
+return -> ordinary_world : and again

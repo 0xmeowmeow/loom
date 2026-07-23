@@ -1,0 +1,48 @@
+# THE MEETING — Scene I of "The Brother and the Brother"
+#
+# SHOWS: objects as nodes. The whole scene is a table, two men, and the things
+# between them. Nothing here is a "plot beat" — the meaning lives entirely in
+# what gets picked up and put down.
+#
+# Walk it and read the story view. The scene never says what it means.
+
+palette neon
+
+let brother   = the other one
+let the_thing = the red pen
+
+node table   "The Bright Room"  type:location shape:hex
+     frag:"the hum of the bright lights" frag:"the light is very bright"
+     frag:"a folder, pale in the light"
+
+node dossier "The Dossier"      type:object
+     frag:"his face on the front of it"
+     frag:"almost identical photographs"
+
+node black   "The Black Pen"    type:object
+     frag:"annotations in his own hand"
+
+node red     "{{the_thing}}"    type:object
+     frag:"corrections in red"
+
+node badge   "The Name Badge"   type:object
+     frag:"a name that is not his"
+     frag:"placed on top, face up"
+
+node hall    "The Dim Hallway"  type:location
+     frag:"dimly lit" frag:"a door closing"
+
+# the ritual. nobody speaks.
+table   <> dossier : lay them out, matching one by one
+dossier -> black   : take the black pen
+dossier -> red     : take the red pen
+black   -> dossier : correct and annotate
+red     -> dossier : correct and annotate
+dossier -> badge   : remove the badge, place it on top
+
+# one leaves. one cannot.
+badge   => hall    : take the other name and leave professionally
+hall    -> table   : the door closes
+
+# and the one who stays picks up what was left
+table   -> red     : pick up the pen he left

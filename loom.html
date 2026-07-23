@@ -5,364 +5,1020 @@
 <title>loom</title>
 <style>
   :root{
-    --bg:#0a0a0f; --panel:#12121a; --line:#2a2a38; --ink:#e8e8f0;
-    --dim:#6a6a80; --hot:#ff2f92; --cool:#00e0d0; --warn:#ffb020;
+    --bg:#0a0a0f; --panel:#12121a; --panel2:#171722; --line:#2a2a38; --ink:#e8e8f0;
+    --dim:#7a7a90; --hot:#ff2f92; --cool:#00e0d0; --warn:#ffb020; --burn:#4a2020;
   }
   *{box-sizing:border-box}
   html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
-    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
-  #app{display:grid;grid-template-columns:1fr 380px;height:100%}
+    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden}
+  #app{display:grid;grid-template-rows:44px 1fr;height:100%}
+
+  #bar{display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--panel);
+    border-bottom:1px solid var(--line)}
+  #bar .sp{flex:1}
+  .btn{background:var(--panel2);color:var(--ink);border:1px solid var(--line);
+    border-radius:5px;padding:6px 11px;cursor:pointer;font:inherit;font-size:12px;
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+  .btn:hover{border-color:var(--hot)}
+  .btn.on{border-color:var(--hot);color:var(--hot)}
+  .btn.ghost{background:none}
+  #stat{color:var(--dim);font-size:11px;white-space:nowrap;overflow:hidden;
+    text-overflow:ellipsis;max-width:40vw}
+  #stat b{color:var(--warn);font-weight:normal}
+
+  #main{display:grid;grid-template-columns:1fr 330px;min-height:0}
+  #main.split{grid-template-columns:1fr 1fr 330px}
+  #main.storyonly{grid-template-columns:1fr 330px}
+  #main.storyonly #canvaswrap{display:none}
+  #storywrap{display:none;overflow:auto;border-right:1px solid var(--line);
+    background:var(--bg)}
+  #main.split #storywrap,#main.storyonly #storywrap{display:block}
+  #story{max-width:62ch;margin:0 auto;padding:34px 26px 80px}
+  #story .sn{margin:0 0 26px;cursor:pointer;padding:8px 10px;border-radius:6px;
+    border-left:3px solid transparent}
+  #story .sn:hover{background:rgba(255,255,255,.03)}
+  #story .sn.on{background:rgba(255,255,255,.05)}
+  #story h4{margin:0 0 6px;font-size:11px;letter-spacing:.13em;
+    text-transform:uppercase;font-weight:normal}
+  #story p{margin:0 0 7px;font-size:14.5px;line-height:1.75;
+    font-family:Georgia,"Liberation Serif",serif;color:var(--ink)}
+  #story .ref{font-size:11px;color:var(--dim);font-family:ui-monospace,monospace}
+  #story .act{margin:0 0 26px;padding-left:22px;color:var(--dim);font-size:13px;
+    font-style:italic;border-left:1px dotted var(--line)}
+  #story .act b{color:var(--warn);font-style:normal;font-size:11px}
+  #story .drm{margin:34px 0;padding:16px 18px;border:1px dashed var(--line);
+    border-radius:8px;color:var(--dim);font-style:italic;font-size:13.5px;
+    line-height:1.9;text-align:center}
+  #story .mt{color:var(--dim);font-style:italic;font-size:12.5px}
+  #story .stub{text-align:center;color:var(--dim);padding:60px 20px;font-size:12.5px;
+    line-height:1.9}
   #canvaswrap{position:relative;overflow:hidden}
-  svg{width:100%;height:100%;display:block;cursor:grab}
+  svg{width:100%;height:100%;display:block;cursor:grab;touch-action:none}
   svg.panning{cursor:grabbing}
-  .node rect{fill:var(--panel);stroke:var(--line);stroke-width:2;rx:6}
-  .node.sel rect{stroke:var(--hot);stroke-width:3}
-  .node.visited rect{stroke:var(--cool)}
-  .node.here rect{fill:#1d1d2a;stroke:var(--hot);stroke-width:3}
-  .node text{fill:var(--ink);font-size:13px;pointer-events:none;user-select:none}
-  .node .sub{fill:var(--dim);font-size:10px}
-  .edge{stroke:var(--line);stroke-width:2;fill:none;marker-end:url(#arrow)}
-  .edge.locks{stroke:var(--warn);stroke-dasharray:6 4;marker-end:url(#arrowW)}
-  .edge.both{marker-start:url(#arrow)}
-  .edge.sel{stroke:var(--hot);marker-end:url(#arrowH)}
-  .edge.burned{stroke:#3a1a1a;stroke-dasharray:2 6}
+  svg.linking{cursor:crosshair}
+
+  .node .body{fill:var(--panel);stroke:var(--line);stroke-width:2}
+  .node:hover .body{stroke:#4a4a60}
+  .node.sel .body{stroke:var(--hot);stroke-width:3;
+    filter:drop-shadow(0 0 10px rgba(255,47,146,.55))}
+  .selring{fill:none;stroke:var(--hot);stroke-width:1.5;opacity:.45;
+    stroke-dasharray:5 4;pointer-events:none}
+  .node.visited .body{stroke:var(--cool)}
+  .node.here .body{stroke:var(--hot);stroke-width:3.5}
+  .node text{fill:var(--ink);font-size:12.5px;pointer-events:none;user-select:none}
+  .node .chev{pointer-events:auto}
+  .node .sub{fill:var(--dim);font-size:9.5px}
+  .node .tglyph{font-size:10px;font-weight:bold;pointer-events:none}
+  .node .stripe{rx:2}
+
+  .slot{stroke-width:2;cursor:crosshair;transition:r .12s ease}
+  .slot:hover{stroke:#fff}
+  .slot.busy{stroke-width:3}
+  .slot.welcome{stroke:#fff;stroke-width:3;animation:pulse 1s ease-in-out infinite}
+  .slot.meh{opacity:.25}
+  .slot.hushed{opacity:.15}
+  @keyframes pulse{
+    0%,100%{filter:drop-shadow(0 0 2px currentColor);opacity:1}
+    50%{filter:drop-shadow(0 0 9px #fff);opacity:.7}
+  }
+  .slotlbl{font-size:9.5px;fill:var(--dim);pointer-events:none;user-select:none}
+  .node .ttl{fill:var(--ink);font-size:12.5px}
+  .node .ref{fill:var(--cool);font-size:10px;pointer-events:none;user-select:none}
+  .node .fragline{fill:#9a9ab0;font-size:10.5px;pointer-events:none;user-select:none}
+  .node .icon{fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;
+    pointer-events:none;opacity:.9}
+  .node .chev{font-size:11px;cursor:pointer;opacity:.55}
+  .node .chev:hover{opacity:1}
+  .slotlbl.hot{fill:#fff;font-weight:bold}
+  .node.dimmed{opacity:.18;transition:opacity .15s}
+  .node.hollow .body{fill-opacity:.28;stroke-dasharray:6 4}
+  .node.hollow .ttl{fill:var(--dim);font-style:italic}
+  .reqbadge{fill:var(--warn);font-size:9px;pointer-events:none}
+  .varchip{color:var(--warn)}
+  .node.target rect.body{stroke-dasharray:4 3}
+
+  .edge{stroke-width:2;fill:none}
+  .edge.locks{stroke-dasharray:7 4}
+  .edge.sel{stroke:var(--hot)!important;stroke-width:4;filter:drop-shadow(0 0 6px rgba(255,47,146,.6))}
+  .edge.burned{stroke:var(--burn)!important;stroke-dasharray:2 6;marker-end:none}
+  .edge.misfit{stroke-dasharray:3 3}
+  .ehit{stroke:transparent;stroke-width:16;fill:none;cursor:pointer}
   .elabel{fill:var(--dim);font-size:10px;pointer-events:none;user-select:none}
+  #ghost{stroke:var(--cool);stroke-width:2;stroke-dasharray:4 4;fill:none;pointer-events:none}
+
   #side{background:var(--panel);border-left:1px solid var(--line);
     display:flex;flex-direction:column;overflow:hidden}
-  .tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto}
-  .tabs button{flex:1;background:none;border:0;color:var(--dim);padding:10px;
-    cursor:pointer;font:inherit;border-bottom:2px solid transparent}
-  .tabs button.on{color:var(--ink);border-bottom-color:var(--hot)}
-  .pane{display:none;padding:12px;overflow:auto;flex:1 1 auto}
+  .stabs{display:flex;border-bottom:1px solid var(--line)}
+  .stabs button{flex:1;background:none;border:0;color:var(--dim);padding:9px;
+    cursor:pointer;font:inherit;font-size:12px;border-bottom:2px solid transparent}
+  .stabs button.on{color:var(--ink);border-bottom-color:var(--hot)}
+  .pane{display:none;padding:12px;overflow:auto;flex:1}
   .pane.on{display:block}
-  textarea{width:100%;height:100%;min-height:400px;background:#0d0d14;color:var(--ink);
-    border:1px solid var(--line);border-radius:4px;padding:10px;
-    font:12px/1.6 ui-monospace,monospace;resize:none}
-  label{display:block;color:var(--dim);font-size:11px;margin:10px 0 3px}
-  input,select{width:100%;background:#0d0d14;color:var(--ink);border:1px solid var(--line);
-    border-radius:4px;padding:7px;font:inherit}
-  button.act{background:#1d1d2a;color:var(--ink);border:1px solid var(--line);
-    border-radius:4px;padding:8px 10px;cursor:pointer;font:inherit;margin:4px 4px 0 0}
-  button.act:hover{border-color:var(--hot)}
-  .hint{color:var(--dim);font-size:11px;margin:8px 0}
-  .frag{background:#0d0d14;border-left:2px solid var(--cool);padding:6px 8px;margin:6px 0;
-    font-size:12px}
-  .frag.seen{border-left-color:var(--line);color:var(--dim)}
-  .opt{display:block;width:100%;text-align:left;background:#0d0d14;color:var(--ink);
-    border:1px solid var(--line);border-radius:4px;padding:8px;margin:4px 0;cursor:pointer;
-    font:inherit}
+  label{display:block;color:var(--dim);font-size:10.5px;margin:11px 0 3px;
+    text-transform:uppercase;letter-spacing:.05em}
+  input,select,textarea{width:100%;background:#0c0c13;color:var(--ink);
+    border:1px solid var(--line);border-radius:4px;padding:7px;font:inherit;font-size:13px}
+  textarea{resize:vertical;font-size:12px;line-height:1.55}
+  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--hot)}
+  .hint{color:var(--dim);font-size:11px;line-height:1.5;margin:8px 0}
+  .row{display:flex;gap:6px}
+  .row>*{flex:1}
+  .empty{color:var(--dim);font-size:12px;text-align:center;padding:26px 10px;line-height:1.8}
+  .opt{display:block;width:100%;text-align:left;background:#0c0c13;color:var(--ink);
+    border:1px solid var(--line);border-radius:5px;padding:9px;margin:5px 0;cursor:pointer;
+    font:inherit;font-size:12.5px}
   .opt:hover{border-color:var(--hot)}
+  .frag{background:#0c0c13;border-left:2px solid var(--cool);padding:7px 9px;margin:5px 0;
+    font-size:12px;border-radius:0 4px 4px 0}
+  .frag.seen{border-left-color:#333;color:var(--dim)}
   .warn{color:var(--warn);font-size:11px}
-  .ok{color:var(--cool);font-size:11px}
-  #status{position:absolute;left:10px;bottom:10px;color:var(--dim);font-size:11px}
+  .chip{display:inline-block;background:#0c0c13;border:1px solid var(--line);
+    border-radius:99px;padding:2px 9px;font-size:11px;color:var(--dim);margin:2px 3px 2px 0}
+  .tdot{display:inline-block;width:8px;height:8px;border-radius:99px;margin-right:5px;
+    vertical-align:middle}
+
+  /* ---- context menu ---- */
+  #menu{position:fixed;z-index:80;background:var(--panel2);border:1px solid var(--line);
+    border-radius:7px;padding:5px;min-width:190px;display:none;
+    box-shadow:0 10px 34px rgba(0,0,0,.6)}
+  #menu.on{display:block}
+  #menu .mi{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;
+    cursor:pointer;font-size:12.5px;white-space:nowrap}
+  #menu .mi:hover{background:#22222f}
+  #menu .mi.dis{color:var(--dim);cursor:default}
+  #menu .mi.dis:hover{background:none}
+  #menu .sep{height:1px;background:var(--line);margin:5px 2px}
+  #menu .hd{padding:5px 10px 3px;font-size:10px;color:var(--dim);letter-spacing:.08em;
+    text-transform:uppercase}
+  #menu .sm{color:var(--dim);font-size:10.5px;margin-left:auto}
+
+  /* ---- modal ---- */
+  #veil{position:fixed;inset:0;background:rgba(5,5,10,.82);display:none;z-index:60;
+    align-items:center;justify-content:center;padding:4vh 4vw}
+  #veil.on{display:flex}
+  #modal{background:var(--panel);border:1px solid var(--line);border-radius:10px;
+    width:100%;max-width:1000px;height:100%;display:flex;flex-direction:column;
+    box-shadow:0 20px 70px rgba(0,0,0,.6)}
+  #mhead{display:flex;align-items:center;gap:10px;padding:11px 14px;
+    border-bottom:1px solid var(--line)}
+  #mhead h3{margin:0;font-size:13px;font-weight:normal;letter-spacing:.06em}
+  #mbody{flex:1;padding:12px 14px;display:flex;min-height:0}
+  #mbody textarea{flex:1;height:100%;background:#0a0a10;line-height:1.7;font-size:13px}
+  #mfoot{padding:9px 14px;border-top:1px solid var(--line);color:var(--dim);
+    font-size:11px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+  kbd{background:#0c0c13;border:1px solid var(--line);border-radius:3px;
+    padding:1px 5px;font-size:10px}
+  code{color:var(--cool);font-size:11px}
 </style>
 </head>
 <body>
 <div id="app">
-  <div id="canvaswrap">
-    <svg id="svg">
-      <defs>
-        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
-          markerHeight="6" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="#2a2a38"/></marker>
-        <marker id="arrowH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
-          markerHeight="6" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="#ff2f92"/></marker>
-        <marker id="arrowW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
-          markerHeight="6" orient="auto-start-reverse">
-          <path d="M0,0 L10,5 L0,10 z" fill="#ffb020"/></marker>
-      </defs>
-      <g id="view">
-        <g id="edges"></g>
-        <g id="nodes"></g>
-      </g>
-    </svg>
-    <div id="status"></div>
+  <div id="bar">
+    <button class="btn" id="v-graph">graph</button>
+    <button class="btn ghost" id="v-split">split</button>
+    <button class="btn ghost" id="v-story">story</button>
+    <span style="width:10px"></span>
+    <button class="btn" id="b-src">source</button>
+    <button class="btn" id="b-tidy">tidy</button>
+    <button class="btn ghost" id="b-foldall">fold all</button>
+    <button class="btn ghost" id="b-openall">unfold</button>
+    <button class="btn ghost on" id="b-auto" title="fold automatically when zoomed out">auto</button>
+    <span class="sp"></span>
+    <select id="palsel" style="width:auto;font-size:11px;padding:4px 6px"></select>
+    <span id="stat"></span>
   </div>
 
-  <div id="side">
-    <div class="tabs">
-      <button data-t="src" class="on">source</button>
-      <button data-t="sel">selected</button>
-      <button data-t="walk">walk</button>
-      <button data-t="out">export</button>
+  <div id="main">
+    <div id="storywrap"><div id="story"></div></div>
+    <div id="canvaswrap">
+      <svg id="svg">
+        <g id="view">
+          <g id="gEdges"></g>
+          <path id="ghost"></path>
+          <g id="gNodes"></g>
+        </g>
+      </svg>
     </div>
 
-    <div class="pane on" id="p-src">
-      <div class="hint">
-        Source of truth. Type fast; the canvas follows.<br>
-        <b>node</b> id "Title" content:path frag:"image"<br>
-        <b>-&gt;</b> retraversable &nbsp; <b>=&gt;</b> locks behind &nbsp; <b>&lt;&gt;</b> both ways<br>
-        text after <b>:</b> is the edge label — the action.
+    <div id="side">
+      <div class="stabs">
+        <button data-t="sel" class="on">inspect</button>
+        <button data-t="walk">walk</button>
+        <button data-t="lex">lexicon</button>
+        <button data-t="out">export</button>
       </div>
-      <textarea id="src" spellcheck="false"></textarea>
+      <div class="pane on" id="p-sel"></div>
+      <div class="pane" id="p-walk"></div>
+      <div class="pane" id="p-lex"></div>
+      <div class="pane" id="p-out">
+        <label>render as</label>
+        <div class="row">
+          <button class="btn" data-x="json">JSON</button>
+          <button class="btn" data-x="twee">Twee</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button class="btn" data-x="cypher">Cypher</button>
+          <button class="btn" data-x="loom">.loom</button>
+        </div>
+        <div class="row" style="margin-top:6px">
+          <button class="btn" data-x="story">story text</button>
+        </div>
+        <label>output</label>
+        <textarea id="outbox" style="height:calc(100vh - 280px)" spellcheck="false"></textarea>
+      </div>
     </div>
+  </div>
+</div>
 
-    <div class="pane" id="p-sel"><div class="hint">Click a node or edge.</div></div>
+<div id="menu"></div>
 
-    <div class="pane" id="p-walk">
-      <div class="hint">Walk the graph. One-way doors burn behind you.
-        Dreams pull fragments from where you haven't been.</div>
-      <label>start</label><select id="startsel"></select>
-      <button class="act" id="startbtn">begin walk</button>
-      <label>dream radius</label>
-      <select id="radius">
-        <option value="1">1 — a guide (next door)</option>
-        <option value="2">2 — nearby</option>
-        <option value="null">∞ — a haunting (anywhere)</option>
-      </select>
-      <div id="walkui"></div>
+<div id="veil">
+  <div id="modal">
+    <div id="mhead">
+      <h3>SOURCE</h3>
+      <span style="flex:1"></span>
+      <span class="hint" id="mstat" style="margin:0"></span>
+      <button class="btn ghost" id="m-close">close</button>
     </div>
-
-    <div class="pane" id="p-out">
-      <button class="act" data-x="json">JSON</button>
-      <button class="act" data-x="twee">Twee (Twine)</button>
-      <button class="act" data-x="cypher">Cypher (neo4j)</button>
-      <button class="act" data-x="loom">.loom source</button>
-      <div class="hint">Nodes hold a <i>reference</i> to content, never the content.
-        That's what lets the same graph render as a page, a door game, or a book.</div>
-      <textarea id="outbox" spellcheck="false"></textarea>
+    <div id="mbody"><textarea id="src" spellcheck="false"></textarea></div>
+    <div id="mfoot">
+      <span><code>node id "Title" type:scene content:path frag:"image"</code></span>
+      <span><code>a -&gt; b : action</code></span>
+      <span><code>=&gt;</code> locks</span>
+      <span><code>&lt;&gt;</code> both</span>
+      <span style="flex:1"></span>
+      <span><kbd>Esc</kbd> close</span>
     </div>
   </div>
 </div>
 
 <script type="module">
 import { parse, serialise, Walk, dream, findDeadEnds, findNonReturning,
-         toJSON, toTwee, toCypher, neighbours } from './src/loom.js';
+         toJSON, toTwee, toCypher, neighbours, TYPES, DEFAULT_TYPE, edgeFits,
+         expand, lexiconReport, emptyNodes, requirementsOn, openRequirements,
+         renderStory, storyToText }
+  from './src/loom.js';
+import { SHAPES, DEFAULT_SHAPES, PALETTES, ICONS } from './src/skin.js';
 
 const SAMPLE = `# the brother and the brother
-# the door is the only node both men pass through.
+# right-click the canvas to add. drag a slot to another node to connect.
 
-node door  "The Door"        content:scenes/door.md  frag:"a door closing" frag:"the dim hallway"
-node table "The Bright Room" content:scenes/table.md frag:"the hum of the lights" frag:"a pale folder" frag:"very bright"
-node red   "The Red Pen"     content:scenes/red.md   frag:"corrections in red"
-node badge "The Name Badge"  content:scenes/badge.md frag:"a name that is not his"
-node hall  "The Hallway"     content:scenes/hall.md  frag:"dimly lit"
+let brother   = Borlu
+let the_thing = the red pen
+let witness   =
+
+node door  "The Door"        type:location frag:"a door closing" frag:"the dim hallway"
+node table  "The Bright Room" type:scene   frag:"the hum of the lights" frag:"a pale folder"
+node red   "{{the_thing}}"   type:object   frag:"corrections in red"
+node badge "The Name Badge"  type:object   frag:"a name that is not his"
+node hall  "The Hallway"     type:location frag:"dimly lit"
+node prom  "The Ascent of Prometheus" type:lore frag:"a subtraction that was never anywhere"
 
 door  <> table : walk in
-table -> red   : pick up the pen
+table -> red   : pick up {{the_thing}}
 table -> badge : take the badge
 red   -> table : keep working
 badge => hall  : leave wearing it
 hall  -> door  : the loop closes
+
+# this node was never declared. the edge created it, empty, with requirements.
+table -> the_twin : look up ! must have {{brother}}'"'"'s face ! must not speak
+the_twin -> door  : leave
 `;
 
-const $ = (s) => document.querySelector(s);
-const svg = $('#svg'), gEdges = $('#edges'), gNodes = $('#nodes'), gView = $('#view');
-let graph = { nodes: [], edges: [], errors: [] };
-let pos = {};            // id -> {x,y}
-let sel = null;          // {kind:'node'|'edge', ...}
-let walk = null;
-let view = { x: 0, y: 0, k: 1 };
+const $=(s)=>document.querySelector(s);
+const svg=$('#svg'), gE=$('#gEdges'), gN=$('#gNodes'), gV=$('#view'), ghost=$('#ghost');
+let graph={nodes:[],edges:[],errors:[]}, pos={}, sel=null, walk=null;
+let view={x:0,y:0,k:1}, linking=null;
+/** per-node display state: 0 folded, 1 normal, 2 expanded */
+let fold={};
+const FOLDED=0, NORMAL=1, OPEN=2;
+const st=(id)=>fold[id]??NORMAL;
+let autoFold=true; const autoFolded=new Set();
+let palette='neon';
+function applyPalette(name){
+  const p=PALETTES[name]||PALETTES.neon; palette=name;
+  const r=document.documentElement.style;
+  r.setProperty('--bg',p.bg); r.setProperty('--panel',p.panel);
+  r.setProperty('--panel2',p.panel2); r.setProperty('--line',p.line);
+  r.setProperty('--ink',p.ink); r.setProperty('--dim',p.dim);
+  r.setProperty('--hot',p.types.scene); r.setProperty('--cool',p.types.location);
+  r.setProperty('--warn',p.types.character);
+  localStorage.setItem('loom.palette',name);
+}
+const COL=(t)=>(PALETTES[palette]||PALETTES.neon).types[t]||'#888';
+const shapeOf=(n)=>SHAPES[n.shape||DEFAULT_SHAPES[n.type]||'rect']||SHAPES.rect;
 
-// ---- layout: keep positions across reparses, seed new nodes on a spiral
-function layout() {
-  let i = 0;
-  graph.nodes.forEach((n) => {
-    if (!pos[n.id]) {
-      const a = i * 2.399, r = 90 * Math.sqrt(i + 1);
-      pos[n.id] = { x: 420 + r * Math.cos(a), y: 300 + r * Math.sin(a) };
+const NW=210, SLOT_R=6.5, SLOT_HIT=16;
+/** node height grows with however many slots it needs */
+function nodeW(n){
+  const s=st(n.id);
+  return s===FOLDED?150 : s===OPEN?300 : NW;
+}
+function nodeH(n){
+  const t=T(n), s=st(n.id);
+  const rows=Math.max((t.inputs||[]).length,(t.outputs||[]).length,1);
+  const slotRoom = 20 + rows*24;
+  if(s===FOLDED) return Math.max(38, slotRoom);
+  if(s===NORMAL) return Math.max(64, 34 + rows*24);
+  // OPEN: room for content ref + fragments + edge count
+  const fragLines = Math.min(n.frags.length, 6);
+  return Math.max(96, 62 + fragLines*15 + (n.content?16:0) + rows*10);
+}
+
+/* ================= source <-> graph ================= */
+function push(){ $('#src').value=serialise(graph); save(); reparse(); }
+function save(){ localStorage.setItem('loom.src',$('#src').value);
+                 localStorage.setItem('loom.pos',JSON.stringify(pos)); }
+function saveFold(){ localStorage.setItem('loom.fold',JSON.stringify(fold)); }
+
+function reparse(){
+  const keep=pos;
+  graph=parse($('#src').value);
+  pos={}; let i=0;
+  graph.nodes.forEach(n=>{ pos[n.id]=keep[n.id]||spiral(i); i++; });
+  const de=findDeadEnds(graph);
+  const nr=graph.nodes.length?findNonReturning(graph,graph.nodes[0].id):[];
+  const bad=graph.edges.filter(e=>!edgeFits(graph,e)).length;
+  let s=`${graph.nodes.length} nodes / ${graph.edges.length} edges`;
+  if(de.length) s+=` &middot; <b>dead end: ${de.join(', ')}</b>`;
+  if(nr.length) s+=` &middot; <b>cannot return: ${nr.join(', ')}</b>`;
+  if(bad) s+=` &middot; <b>${bad} type mismatch</b>`;
+  const em=emptyNodes(graph).length;
+  const ub=lexiconReport(graph).filter(v=>!v.bound).length;
+  if(em) s+=` &middot; ${em} undescribed`;
+  if(ub) s+=` &middot; <b>${ub} unbound</b>`;
+  if(graph.errors.length) s+=` &middot; <b>${graph.errors.length} unparsed</b>`;
+  $('#stat').innerHTML=s; $('#mstat').innerHTML=s;
+  draw(); showSel(); renderWalk(); renderLex(); renderStoryView();
+}
+function spiral(i){ const a=i*2.399, r=105*Math.sqrt(i+1);
+  return {x:440+r*Math.cos(a), y:310+r*Math.sin(a)}; }
+const T=(n)=>({...(TYPES[n?.type]||TYPES[DEFAULT_TYPE]), colour:COL(n?.type||DEFAULT_TYPE)});
+const X=(str)=>expand(str, graph.lexicon||{});
+const hasVar=(str)=>/\{\{\s*[A-Za-z0-9_]+\s*\}\}/.test(String(str||''));
+const isEmpty=(n)=>n.empty||(!n.content&&!n.frags.length&&n.title===n.id);
+
+/* ================= slot geometry ================= */
+function slotsOf(n){
+  const t=T(n), H=nodeH(n), W=nodeW(n), sh=shapeOf(n), out=[];
+  (t.inputs||[]).forEach((s,i,arr)=>{
+    const p=sh.port(W,H,'in',i,arr.length); out.push({...s,dir:'in',x:p.x,y:p.y}); });
+  (t.outputs||[]).forEach((s,i,arr)=>{
+    const p=sh.port(W,H,'out',i,arr.length); out.push({...s,dir:'out',x:p.x,y:p.y}); });
+  return out;
+}
+function slotPoint(nid,dir,name){
+  const n=graph.nodes.find(x=>x.id===nid); if(!n) return null;
+  const p=pos[nid]; if(!p) return null;
+  const all=slotsOf(n);
+  const s=all.find(s=>s.dir===dir&&(!name||s.name===name))||all.find(s=>s.dir===dir);
+  if(!s) return {x:p.x,y:p.y};
+  return {x:p.x-nodeW(n)/2+s.x, y:p.y-nodeH(n)/2+s.y};
+}
+/** would a wire from `linking` be welcome at this input slot? advisory only. */
+function slotWelcomes(srcId,slot,tgtNode){
+  if(!srcId) return false;
+  const src=graph.nodes.find(n=>n.id===srcId); if(!src) return false;
+  const t=T(src);
+  const outSlot=(t.outputs||[]).find(o=>o.name===slot)||(t.outputs||[])[0];
+  const outOk = !outSlot || outSlot.accepts.includes('*') || outSlot.accepts.includes(tgtNode.type);
+  return outOk;
+}
+/** best input slot on a node for the wire currently being dragged */
+function bestInSlot(n){
+  const ins=slotsOf(n).filter(s=>s.dir==='in');
+  if(!ins.length) return null;
+  const good=ins.find(s=>s.accepts.includes('*')||
+    s.accepts.includes(graph.nodes.find(x=>x.id===linking?.from)?.type));
+  return (good||ins[0]).name;
+}
+
+/* ================= draw ================= */
+function draw(){
+  gV.setAttribute('transform',`translate(${view.x},${view.y}) scale(${view.k})`);
+  gE.innerHTML=''; gN.innerHTML='';
+
+  graph.edges.forEach((e,idx)=>{
+    const a=slotPoint(e.from,'out',e.fromSlot), b=slotPoint(e.to,'in',e.toSlot);
+    if(!a||!b) return;
+    const dx=Math.max(45,Math.abs(b.x-a.x)*0.5);
+    const d=`M${a.x},${a.y} C${a.x+dx},${a.y} ${b.x-dx},${b.y} ${b.x},${b.y}`;
+    const src=graph.nodes.find(n=>n.id===e.from);
+    const col=T(src).colour;
+
+    const hit=mk('path',{d,class:'ehit'});
+    hit.oncontextmenu=(ev)=>{ev.preventDefault();ev.stopPropagation();
+      sel={kind:'edge',idx}; draw(); showSel(); edgeMenu(ev,idx);};
+    hit.onclick=(ev)=>{ev.stopPropagation(); sel={kind:'edge',idx};draw();showSel();tab('sel');};
+    gE.appendChild(hit);
+
+    let cls='edge'+(e.locks?' locks':'')+(!edgeFits(graph,e)?' misfit':'');
+    if(sel?.kind==='edge'&&sel.idx===idx) cls+=' sel';
+    if(walk?.burned.has(`${e.from}|${e.to}|${e.arrow}`)) cls+=' burned';
+    const p=mk('path',{d,class:cls}); p.style.stroke=col; gE.appendChild(p);
+
+    if(e.label){
+      const t=mk('text',{x:(a.x+b.x)/2,y:(a.y+b.y)/2-7,class:'elabel','text-anchor':'middle'});
+      t.textContent=X(e.label)+((e.requires||[]).length?'  !'+e.requires.length:''); gE.appendChild(t);
     }
-    i++;
   });
-}
 
-function reparse() {
-  graph = parse($('#src').value);
-  layout();
-  draw();
-  const de = findDeadEnds(graph);
-  const nr = graph.nodes.length ? findNonReturning(graph, graph.nodes[0].id) : [];
-  const bits = [`${graph.nodes.length} nodes · ${graph.edges.length} edges`];
-  if (graph.errors.length) bits.push(`${graph.errors.length} unparsed`);
-  if (de.length) bits.push(`dead end: ${de.join(', ')}`);
-  if (nr.length) bits.push(`cannot return: ${nr.join(', ')}`);
-  $('#status').textContent = bits.join('  ·  ');
-  const s = $('#startsel'); s.innerHTML = '';
-  graph.nodes.forEach((n) => s.add(new Option(n.title, n.id)));
-}
+  graph.nodes.forEach(n=>{
+    const p=pos[n.id], t=T(n), H=nodeH(n), W=nodeW(n), state=st(n.id), mt=isEmpty(n);
+    const isSrc = linking?.from===n.id;
+    const dim = linking && !isSrc && !slotsOf(n).some(s=>s.dir==='in');
+    const g=mk('g',{class:'node'+
+      (sel?.kind==='node'&&sel.id===n.id?' sel':'')+
+      (walk?.visited.has(n.id)?' visited':'')+
+      (walk?.current===n.id?' here':'')+
+      (linking&&!isSrc?' target':'')+
+      (dim?' dimmed':'')+(mt?' hollow':''),
+      transform:`translate(${p.x-W/2},${p.y-H/2})`});
 
-const NW = 150, NH = 46;
-function draw() {
-  gView.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
-  gEdges.innerHTML = ''; gNodes.innerHTML = '';
+    const sh=shapeOf(n);
+    if(sel?.kind==='node'&&sel.id===n.id)
+      g.appendChild(mk('rect',{class:'selring',x:-9,y:-9,width:W+18,height:H+18,rx:13}));
+    const body=mk('path',{class:'body',d:sh.path(W,H)}); g.appendChild(body);
+    // icon in place of the old colour stripe
+    const ic=mk('path',{class:'icon',d:ICONS[n.type]||ICONS.note,
+      transform:`translate(${sh.textX-9},${(state===FOLDED?H/2-8:11)}) scale(0.72)`});
+    ic.style.stroke=t.colour; g.appendChild(ic);
 
-  graph.edges.forEach((e, idx) => {
-    const a = pos[e.from], b = pos[e.to];
-    if (!a || !b) return;
-    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
-    const ux = dx / L, uy = dy / L, pad = 78;
-    const x1 = a.x + ux * pad, y1 = a.y + uy * pad;
-    const x2 = b.x - ux * pad, y2 = b.y - uy * pad;
-    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    const mx = (x1 + x2) / 2 - uy * 26, my = (y1 + y2) / 2 + ux * 26;
-    p.setAttribute('d', `M${x1},${y1} Q${mx},${my} ${x2},${y2}`);
-    let cls = 'edge' + (e.locks ? ' locks' : '') + (!e.directed ? ' both' : '');
-    if (sel?.kind === 'edge' && sel.idx === idx) cls += ' sel';
-    if (walk?.burned.has(`${e.from}|${e.to}|${e.arrow}`)) cls += ' burned';
-    p.setAttribute('class', cls);
-    p.style.pointerEvents = 'stroke';
-    p.style.cursor = 'pointer';
-    p.onclick = (ev) => { ev.stopPropagation(); sel = { kind: 'edge', idx }; draw(); showSel(); };
-    gEdges.appendChild(p);
-    if (e.label) {
-      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-      t.setAttribute('x', mx); t.setAttribute('y', my); t.setAttribute('class', 'elabel');
-      t.setAttribute('text-anchor', 'middle'); t.textContent = e.label;
-      gEdges.appendChild(t);
+    // fold chevron — click to cycle folded -> normal -> expanded
+    const cy=H<44?H/2+4:19;
+    const chev=mk('text',{class:'chev',x:W-13,y:cy});
+    chev.textContent = state===FOLDED?'\u25B8' : state===NORMAL?'\u25BE' : '\u25BF';
+    chev.style.fill=t.colour; g.appendChild(chev);
+    const chit=mk('circle',{cx:W-16,cy:cy-4,r:13,'data-chev':'1'});
+    chit.style.fill='transparent'; chit.style.cursor='pointer';
+    chit.onpointerdown=(ev)=>{ev.stopPropagation(); ev.preventDefault();
+      fold[n.id]=(state+1)%3; saveFold(); draw();};
+    g.appendChild(chit);
+
+    if(state===FOLDED){
+      const ti=mk('text',{class:'ttl',x:sh.textX+13,y:H/2+4});
+      ti.textContent=X(String(n.title)).slice(0,16); g.appendChild(ti);
+    } else {
+      const ti=mk('text',{class:'ttl',x:sh.textX+13,y:23});
+      ti.textContent=X(String(n.title)).slice(0,state===OPEN?34:24); g.appendChild(ti);
+      const sb=mk('text',{class:'sub',x:sh.textX+13,y:38});
+      sb.textContent=mt?`${t.label.toLowerCase()}  \u00b7 undescribed`:`${t.label.toLowerCase()}  ${n.frags.length} frag`;
+      g.appendChild(sb);
+
+      if(state===OPEN){
+        let y=56;
+        if(n.content){
+          const c=mk('text',{class:'ref',x:sh.textX+13,y}); c.textContent=X(n.content);
+          g.appendChild(c); y+=17;
+        }
+        n.frags.slice(0,6).forEach(f=>{
+          const fr=mk('text',{class:'fragline',x:sh.textX+13,y});
+          fr.textContent='\u25C8 '+X(String(f)).slice(0,36); g.appendChild(fr); y+=15;
+        });
+        if(n.frags.length>6){
+          const m=mk('text',{class:'sub',x:sh.textX+13,y}); m.textContent=`+${n.frags.length-6} more`;
+          g.appendChild(m);
+        }
+      }
     }
-  });
 
-  graph.nodes.forEach((n) => {
-    const p = pos[n.id];
-    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-    let cls = 'node';
-    if (sel?.kind === 'node' && sel.id === n.id) cls += ' sel';
-    if (walk?.visited.has(n.id)) cls += ' visited';
-    if (walk?.current === n.id) cls += ' here';
-    g.setAttribute('class', cls);
-    g.setAttribute('transform', `translate(${p.x - NW / 2},${p.y - NH / 2})`);
-    g.innerHTML =
-      `<rect width="${NW}" height="${NH}"></rect>` +
-      `<text x="10" y="19">${esc(n.title).slice(0, 20)}</text>` +
-      `<text x="10" y="34" class="sub">${n.frags.length} frag · ${esc(n.id)}</text>`;
-    g.style.cursor = 'move';
-    g.onpointerdown = (ev) => startDrag(ev, n.id);
-    g.onclick = (ev) => { ev.stopPropagation(); sel = { kind: 'node', id: n.id }; draw(); showSel(); };
-    gNodes.appendChild(g);
-  });
-}
-const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+    slotsOf(n).forEach(s=>{
+      const used = s.dir==='out'
+        ? graph.edges.some(e=>e.from===n.id)
+        : graph.edges.some(e=>e.to===n.id);
+      // is this a live drop target right now?
+      const live = linking && !isSrc && s.dir==='in';
+      const welcome = live && slotWelcomes(linking.from, linking.slot, n)
+        && (s.accepts.includes('*') ||
+            s.accepts.includes(graph.nodes.find(x=>x.id===linking.from)?.type));
 
-// ---- drag nodes / pan / zoom
-let drag = null;
-function startDrag(ev, id) {
-  ev.stopPropagation();
-  drag = { id, sx: ev.clientX, sy: ev.clientY, ox: pos[id].x, oy: pos[id].y };
-  svg.setPointerCapture(ev.pointerId);
-}
-svg.addEventListener('pointermove', (ev) => {
-  if (drag) {
-    pos[drag.id].x = drag.ox + (ev.clientX - drag.sx) / view.k;
-    pos[drag.id].y = drag.oy + (ev.clientY - drag.sy) / view.k;
-    draw();
-  } else if (pan) {
-    view.x = pan.ox + (ev.clientX - pan.sx);
-    view.y = pan.oy + (ev.clientY - pan.sy);
-    draw();
-  }
-});
-svg.addEventListener('pointerup', () => { drag = null; pan = null; svg.classList.remove('panning'); });
-let pan = null;
-svg.addEventListener('pointerdown', (ev) => {
-  if (ev.target.closest('.node') || ev.target.closest('.edge')) return;
-  pan = { sx: ev.clientX, sy: ev.clientY, ox: view.x, oy: view.y };
-  svg.classList.add('panning');
-  sel = null; draw(); showSel();
-});
-svg.addEventListener('wheel', (ev) => {
-  ev.preventDefault();
-  const f = ev.deltaY < 0 ? 1.1 : 0.9;
-  view.k = Math.max(0.25, Math.min(3, view.k * f));
-  draw();
-}, { passive: false });
+      const cls='slot'+(used?' busy':'')
+        +(live?(welcome?' welcome':' meh'):'')
+        +(linking&&s.dir==='out'&&!isSrc?' hushed':'');
+      const c=mk('circle',{class:cls,cx:s.x,cy:s.y,r:welcome?SLOT_R*1.7:SLOT_R});
+      c.style.fill=used?t.colour:'#0c0c13'; c.style.stroke=t.colour;
+      g.appendChild(c);
 
-// ---- selected pane
-function showSel() {
-  const el = $('#p-sel');
-  if (!sel) { el.innerHTML = '<div class="hint">Click a node or edge.</div>'; return; }
-  if (sel.kind === 'node') {
-    const n = graph.nodes.find((x) => x.id === sel.id);
-    if (!n) return;
-    el.innerHTML =
-      `<label>id</label><input value="${esc(n.id)}" disabled>
-       <label>title</label><input id="f-title" value="${esc(n.title)}">
-       <label>content reference</label><input id="f-content" value="${esc(n.content || '')}"
-         placeholder="scenes/door.md — a pointer, not the prose">
-       <label>dream fragments (one per line)</label>
-       <textarea id="f-frags" style="min-height:120px">${n.frags.map(esc).join('\n')}</textarea>
-       <button class="act" id="f-apply">apply to source</button>`;
-    $('#f-apply').onclick = () => {
-      n.title = $('#f-title').value;
-      n.content = $('#f-content').value || null;
-      n.frags = $('#f-frags').value.split('\n').map((s) => s.trim()).filter(Boolean);
-      $('#src').value = serialise(graph);
-      reparse(); showSel();
+      // invisible fat hit ring so you can actually land the drop
+      const hit=mk('circle',{cx:s.x,cy:s.y,r:SLOT_HIT,'data-slot':s.dir});
+      hit.style.fill='transparent'; hit.style.cursor='crosshair';
+      hit.onpointerdown=(ev)=>{ if(s.dir==='out'){ev.stopPropagation(); beginLink(n.id,s.name,ev);} };
+      hit.onpointerup=(ev)=>{ if(linking&&s.dir==='in'){ev.stopPropagation(); finishLink(n.id,s.name);} };
+      const l=mk('text',{class:'slotlbl'+(welcome?' hot':''),
+        x:s.dir==='out'?s.x-11:s.x+12, y:s.y+3.5,
+        'text-anchor':s.dir==='out'?'end':'start'});
+      l.textContent=s.name; g.appendChild(l);
+      g.appendChild(hit);   // hit ring on top of everything
+    });
+
+    g.onpointerdown=(ev)=>{
+      if(ev.button!==0) return;
+      // a slot or the chevron owns this event, not the drag
+      if(ev.target.hasAttribute?.('data-slot')||ev.target.hasAttribute?.('data-chev')) return;
+      if(linking) return;
+      dragStart(ev,n.id);
     };
+    g.onpointerup=(ev)=>{ if(linking&&linking.from!==n.id){ev.stopPropagation();
+      finishLink(n.id,bestInSlot(n));} };
+    g.onclick=(ev)=>{ev.stopPropagation();
+      if(linking){finishLink(n.id,bestInSlot(n));return;}
+      sel={kind:'node',id:n.id};draw();showSel();tab('sel');};
+    g.oncontextmenu=(ev)=>{ev.preventDefault();ev.stopPropagation();
+      sel={kind:'node',id:n.id};draw();showSel();nodeMenu(ev,n.id);};
+    gN.appendChild(g);
+  });
+}
+function mk(t,at){ const e=document.createElementNS('http://www.w3.org/2000/svg',t);
+  for(const k in at) e.setAttribute(k,at[k]); return e; }
+const esc=(s)=>String(s??'').replace(/[<>&"]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]));
+
+/* ================= linking ================= */
+function beginLink(id,slot,ev){ linking={from:id,slot}; svg.classList.add('linking');
+  try{ svg.setPointerCapture(ev.pointerId); }catch{}
+  draw(); }
+function finishLink(toId,toSlot){
+  if(linking&&linking.from!==toId){
+    graph.edges.push({from:linking.from,to:toId,label:'',arrow:'->',
+      directed:true,locks:false,trigger:null,
+      fromSlot:linking.slot||null,toSlot:toSlot||null});
+    linking=null; svg.classList.remove('linking'); ghost.setAttribute('d','');
+    push(); sel={kind:'edge',idx:graph.edges.length-1}; showSel(); tab('sel'); return;
+  }
+  linking=null; svg.classList.remove('linking'); ghost.setAttribute('d',''); draw();
+}
+
+/* ================= drag / pan / zoom ================= */
+let drag=null, pan=null;
+function dragStart(ev,id){ ev.stopPropagation();
+  drag={id,sx:ev.clientX,sy:ev.clientY,ox:pos[id].x,oy:pos[id].y};
+  try{ svg.setPointerCapture(ev.pointerId); }catch{} }
+svg.addEventListener('pointermove',ev=>{
+  if(linking){ const a=slotPoint(linking.from,'out',linking.slot);
+    const pt=toWorld(ev.clientX,ev.clientY);
+    if(a) ghost.setAttribute('d',`M${a.x},${a.y} C${a.x+60},${a.y} ${pt.x-60},${pt.y} ${pt.x},${pt.y}`);
+    return; }
+  if(drag){ pos[drag.id].x=drag.ox+(ev.clientX-drag.sx)/view.k;
+            pos[drag.id].y=drag.oy+(ev.clientY-drag.sy)/view.k; draw(); }
+  else if(pan){ view.x=pan.ox+(ev.clientX-pan.sx); view.y=pan.oy+(ev.clientY-pan.sy); draw(); }
+});
+/** which node is under this screen point? */
+function nodeAt(cx,cy){
+  const p=toWorld(cx,cy);
+  for(let i=graph.nodes.length-1;i>=0;i--){
+    const n=graph.nodes[i], q=pos[n.id]; if(!q) continue;
+    const W=nodeW(n), H=nodeH(n);
+    if(p.x>=q.x-W/2-14 && p.x<=q.x+W/2+14 && p.y>=q.y-H/2-14 && p.y<=q.y+H/2+14) return n;
+  }
+  return null;
+}
+svg.addEventListener('pointerup',(ev)=>{
+  if(drag) save();
+  if(linking){
+    const tgt=nodeAt(ev.clientX,ev.clientY);
+    if(tgt && tgt.id!==linking.from){ finishLink(tgt.id,bestInSlot(tgt)); }
+    else { linking=null; ghost.setAttribute('d',''); svg.classList.remove('linking'); draw(); }
+  }
+  drag=null; pan=null; svg.classList.remove('panning');
+});
+svg.addEventListener('pointerdown',ev=>{
+  if(ev.button!==0) return;
+  if(ev.target.closest('.node')||ev.target.closest('.ehit')) return;
+  hideMenu();
+  pan={sx:ev.clientX,sy:ev.clientY,ox:view.x,oy:view.y};
+  svg.classList.add('panning'); sel=null; draw(); showSel();
+});
+svg.addEventListener('wheel',ev=>{ev.preventDefault();
+  const f=ev.deltaY<0?1.12:0.89;
+  const was=view.k;
+  view.k=Math.max(.2,Math.min(3,view.k*f));
+  // zoom out far enough and everything folds itself away; zoom back in and it returns
+  if(autoFold){
+    if(was>=.55 && view.k<.55) graph.nodes.forEach(n=>{ if(st(n.id)!==FOLDED) autoFolded.add(n.id); fold[n.id]=FOLDED; });
+    if(was<.55 && view.k>=.55){ autoFolded.forEach(id=>fold[id]=NORMAL); autoFolded.clear(); }
+  }
+  draw();
+},{passive:false});
+svg.addEventListener('contextmenu',ev=>{
+  if(ev.target.closest('.node')||ev.target.closest('.ehit')) return;
+  ev.preventDefault(); canvasMenu(ev);
+});
+function toWorld(cx,cy){ const r=svg.getBoundingClientRect();
+  return {x:(cx-r.left-view.x)/view.k,y:(cy-r.top-view.y)/view.k}; }
+
+/* ================= context menus ================= */
+const menu=$('#menu');
+function hideMenu(){ menu.classList.remove('on'); }
+document.addEventListener('pointerdown',e=>{ if(!menu.contains(e.target)) hideMenu(); },true);
+
+function openMenu(ev,items){
+  menu.innerHTML='';
+  items.forEach(it=>{
+    if(it.sep){ menu.appendChild(Object.assign(document.createElement('div'),{className:'sep'})); return; }
+    if(it.head){ const h=document.createElement('div'); h.className='hd'; h.textContent=it.head;
+      menu.appendChild(h); return; }
+    const d=document.createElement('div');
+    d.className='mi'+(it.disabled?' dis':'');
+    d.innerHTML=(it.colour?`<span class="tdot" style="background:${it.colour}"></span>`:'')
+      +esc(it.label)+(it.sub?`<span class="sm">${esc(it.sub)}</span>`:'');
+    if(!it.disabled) d.onclick=()=>{ hideMenu(); it.run&&it.run(); };
+    menu.appendChild(d);
+  });
+  menu.classList.add('on');
+  const r=menu.getBoundingClientRect();
+  menu.style.left=Math.min(ev.clientX,innerWidth-r.width-8)+'px';
+  menu.style.top=Math.min(ev.clientY,innerHeight-r.height-8)+'px';
+}
+
+function canvasMenu(ev){
+  const w=toWorld(ev.clientX,ev.clientY);
+  const items=[{head:'add node here'}];
+  Object.entries(TYPES).forEach(([k,t])=>items.push({
+    label:t.label, colour:t.colour, sub:t.glyph,
+    run:()=>addNode(k,w.x,w.y)
+  }));
+  items.push({sep:true},
+    {label:'tidy layout',run:()=>$('#b-tidy').click()},
+    {label:'edit source',sub:'Ctrl+E',run:openSrc});
+  openMenu(ev,items);
+}
+
+function nodeMenu(ev,id){
+  const n=graph.nodes.find(x=>x.id===id); if(!n) return;
+  const items=[{head:`${T(n).label.toLowerCase()} · ${id}`}];
+  items.push({label:'change type to…',disabled:true});
+  Object.entries(TYPES).forEach(([k,t])=>{
+    if(k===n.type) return;
+    items.push({label:t.label,colour:t.colour,run:()=>{n.type=k;push();}});
+  });
+  items.push({sep:true},
+    {label:'fold',sub:'small',run:()=>{fold[id]=FOLDED;saveFold();draw();}},
+    {label:'normal',run:()=>{fold[id]=NORMAL;saveFold();draw();}},
+    {label:'expand',sub:'show all',run:()=>{fold[id]=OPEN;saveFold();draw();}},
+    {sep:true},
+    {label:'duplicate',run:()=>{
+      let i=1,nid; do{nid=id+'_'+i++;}while(graph.nodes.some(x=>x.id===nid));
+      graph.nodes.push({...n,id:nid,frags:[...n.frags],tags:[...n.tags]});
+      pos[nid]={x:pos[id].x+40,y:pos[id].y+40}; push();}},
+    {label:'start walk here',run:()=>{walk=new Walk(graph,id);tab('walk');renderWalk();draw();}},
+    {sep:true},
+    {label:'delete node',run:()=>{
+      graph.nodes=graph.nodes.filter(x=>x.id!==id);
+      graph.edges=graph.edges.filter(e=>e.from!==id&&e.to!==id);
+      delete pos[id]; sel=null; push();}});
+  openMenu(ev,items);
+}
+
+function edgeMenu(ev,idx){
+  const e=graph.edges[idx]; if(!e) return;
+  const items=[{head:`edge · ${e.from} ${e.arrow} ${e.to}`}];
+  [['->','one way, can repeat'],['=>','one way, locks behind'],['<>','both ways']]
+    .forEach(([k,lab])=>{ if(k!==e.arrow) items.push({label:lab,sub:k,
+      run:()=>{e.arrow=k;push();}}); });
+  items.push({sep:true},
+    {label:'reverse direction',run:()=>{const t=e.from;e.from=e.to;e.to=t;push();}},
+    {label:'delete edge',run:()=>{graph.edges.splice(idx,1);sel=null;push();}});
+  openMenu(ev,items);
+}
+
+function addNode(type,x,y){
+  let i=1,id; do{ id=type[0]+i++; }while(graph.nodes.some(n=>n.id===id));
+  graph.nodes.push({id,type,title:'untitled',content:null,frags:[],tags:[]});
+  pos[id]={x,y}; push(); sel={kind:'node',id}; showSel(); tab('sel');
+}
+
+/* ================= toolbar / modal ================= */
+$('#b-auto').onclick=()=>{ autoFold=!autoFold; $('#b-auto').classList.toggle('on',autoFold); };
+$('#b-foldall').onclick=()=>{ graph.nodes.forEach(n=>fold[n.id]=FOLDED); saveFold(); draw(); };
+$('#b-openall').onclick=()=>{ graph.nodes.forEach(n=>fold[n.id]=NORMAL); saveFold(); draw(); };
+$('#b-tidy').onclick=()=>{ let i=0; graph.nodes.forEach(n=>{pos[n.id]=spiral(i++);}); save(); draw(); };
+function openSrc(){ $('#veil').classList.add('on'); $('#src').focus(); }
+function closeSrc(){ $('#veil').classList.remove('on'); }
+$('#b-src').onclick=openSrc; $('#m-close').onclick=closeSrc;
+$('#veil').onclick=e=>{ if(e.target===$('#veil')) closeSrc(); };
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){ hideMenu();
+    if($('#veil').classList.contains('on')) closeSrc();
+    else if(linking){linking=null;ghost.setAttribute('d','');svg.classList.remove('linking');draw();} }
+  if((e.metaKey||e.ctrlKey)&&e.key==='e'){e.preventDefault();
+    $('#veil').classList.contains('on')?closeSrc():openSrc();}
+  if(e.key===' '&&sel?.kind==='node'&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){
+    e.preventDefault(); fold[sel.id]=(st(sel.id)+1)%3; saveFold(); draw(); }
+  if(e.key==='Delete'&&sel&&!/INPUT|TEXTAREA/.test(document.activeElement.tagName)){
+    if(sel.kind==='node'){ graph.nodes=graph.nodes.filter(x=>x.id!==sel.id);
+      graph.edges=graph.edges.filter(x=>x.from!==sel.id&&x.to!==sel.id); delete pos[sel.id]; }
+    else graph.edges.splice(sel.idx,1);
+    sel=null; push(); }
+});
+$('#src').addEventListener('input',()=>{save();reparse();});
+
+/* ================= inspect ================= */
+function tab(t){ document.querySelectorAll('.stabs button').forEach(b=>
+    b.classList.toggle('on',b.dataset.t===t));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t)); }
+document.querySelectorAll('.stabs button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+
+function showSel(){
+  const el=$('#p-sel');
+  if(!sel){ el.innerHTML=`<div class="empty">
+    <b>Right-click the canvas</b> to add a node.<br><br>
+    Drag from a coloured slot on a node's right edge<br>to a slot on another node's left edge.<br><br>
+    <b>Right-click</b> a node or edge for its options.</div>`; return; }
+
+  if(sel.kind==='node'){
+    const n=graph.nodes.find(x=>x.id===sel.id); if(!n){sel=null;return showSel();}
+    const t=T(n);
+    const outs=neighbours(graph,n.id).length;
+    const ins=graph.edges.filter(e=>e.to===n.id||(!e.directed&&e.from===n.id)).length;
+    el.innerHTML=`
+      <div><span class="chip"><span class="tdot" style="background:${t.colour}"></span>${esc(t.label)}</span>
+        <span class="chip">${outs} out</span><span class="chip">${ins} in</span></div>
+      <div class="hint">${esc(t.desc)}</div>
+      <div class="row">
+        <div><label>shape</label>
+          <select id="f-shape">
+            <option value="">default (${esc(SHAPES[DEFAULT_SHAPES[n.type]||'rect']?.label||'Rectangle')})</option>
+            ${Object.entries(SHAPES).map(([k,v])=>
+              `<option value="${k}" ${k===n.shape?'selected':''}>${esc(v.label)}</option>`).join('')}
+          </select></div>
+      </div>
+      <label>type</label>
+      <select id="f-type">${Object.entries(TYPES).map(([k,v])=>
+        `<option value="${k}" ${k===n.type?'selected':''}>${esc(v.label)}</option>`).join('')}</select>
+      <label>id</label><input id="f-id" value="${esc(n.id)}">
+      <label>title</label><input id="f-title" value="${esc(n.title)}">
+      <label>content reference</label>
+      <input id="f-content" value="${esc(n.content||'')}" placeholder="scenes/door.md">
+      <label>dream fragments &mdash; one per line</label>
+      <textarea id="f-frags" style="height:120px">${esc(n.frags.join('\n'))}</textarea>
+      <label>edges from here</label><div id="f-edges"></div>
+      <div id="f-reqs"></div>`;
+    const reqs=requirementsOn(graph,n.id);
+    if(reqs.length){
+      const r=$('#f-reqs');
+      r.innerHTML='<label>required of this node</label>'+
+        reqs.map(x=>`<div class="frag" style="border-left-color:var(--warn)">
+          ${esc(X(x.req))} <span style="color:var(--dim)">&larr; ${esc(x.from)}</span></div>`).join('');
+    }
+    const list=$('#f-edges');
+    const mine=graph.edges.map((e,i)=>({e,i})).filter(({e})=>e.from===n.id||(!e.directed&&e.to===n.id));
+    list.innerHTML=mine.length?'':'<div class="hint">none</div>';
+    mine.forEach(({e,i})=>{
+      const b=document.createElement('button'); b.className='opt';
+      b.innerHTML=`${esc(e.arrow)} <b>${esc(e.from===n.id?e.to:e.from)}</b><br>
+        <span style="color:var(--dim)">${esc(e.label||'(no action)')}</span>`;
+      b.onclick=()=>{sel={kind:'edge',idx:i};draw();showSel();};
+      list.appendChild(b);
+    });
+    const apply=()=>{
+      const nid=$('#f-id').value.trim().replace(/\s+/g,'_')||n.id;
+      if(nid!==n.id&&!graph.nodes.some(x=>x.id===nid)){
+        graph.edges.forEach(e=>{if(e.from===n.id)e.from=nid;if(e.to===n.id)e.to=nid;});
+        pos[nid]=pos[n.id]; delete pos[n.id]; n.id=nid; sel={kind:'node',id:nid};
+      }
+      n.type=$('#f-type').value; n.shape=$('#f-shape').value||null;
+      n.title=$('#f-title').value;
+      n.content=$('#f-content').value.trim()||null;
+      n.frags=$('#f-frags').value.split('\n').map(s=>s.trim()).filter(Boolean);
+      push(); showSel();
+    };
+    ['f-type','f-shape','f-id','f-title','f-content','f-frags'].forEach(id=>{
+      const e2=$('#'+id); e2.onchange=apply;
+      e2.onkeydown=ev=>{if(ev.key==='Enter'&&id!=='f-frags'){ev.preventDefault();apply();}};
+    });
+
   } else {
-    const e = graph.edges[sel.idx];
-    el.innerHTML =
-      `<label>edge</label><input value="${esc(e.from)} ${e.arrow} ${esc(e.to)}" disabled>
-       <label>action (the label)</label><input id="e-label" value="${esc(e.label)}">
-       <label>kind</label>
-       <select id="e-arrow">
-         <option value="->" ${e.arrow === '->' ? 'selected' : ''}>-&gt; retraversable</option>
-         <option value="=>" ${e.arrow === '=>' ? 'selected' : ''}>=&gt; locks behind you</option>
-         <option value="<>" ${e.arrow === '<>' ? 'selected' : ''}>&lt;&gt; both ways</option>
-       </select>
-       <label>trigger <span class="hint">(leave blank until you know)</span></label>
-       <input id="e-trig" value="${esc(e.trigger || '')}">
-       <button class="act" id="e-apply">apply to source</button>`;
-    $('#e-apply').onclick = () => {
-      e.label = $('#e-label').value;
-      e.arrow = $('#e-arrow').value;
-      $('#src').value = serialise(graph);
-      reparse(); showSel();
-    };
+    const e=graph.edges[sel.idx]; if(!e){sel=null;return showSel();}
+    const opts=graph.nodes.map(n=>`<option value="${esc(n.id)}">${esc(n.id)}</option>`).join('');
+    const fits=edgeFits(graph,e);
+    el.innerHTML=`
+      ${fits?'':'<div class="warn">type mismatch &mdash; allowed, but flagged.</div>'}
+      <label>action</label>
+      <input id="e-label" value="${esc(e.label)}" placeholder="walk in">
+      <label>direction</label>
+      <select id="e-arrow">
+        <option value="->" ${e.arrow==='->'?'selected':''}>one way, can repeat</option>
+        <option value="=>" ${e.arrow==='=>'?'selected':''}>one way, locks behind</option>
+        <option value="<>" ${e.arrow==='<>'?'selected':''}>both ways</option>
+      </select>
+      <div class="row">
+        <div><label>from</label><select id="e-from">${opts}</select></div>
+        <div><label>to</label><select id="e-to">${opts}</select></div>
+      </div>
+      <label>requires &mdash; one per line</label>
+      <div class="hint" style="margin:2px 0 4px">What the far end must be or do.
+        Checked when you fill it in.</div>
+      <textarea id="e-req" style="height:70px"
+        placeholder="must give the object&#10;must be a person">${esc((e.requires||[]).join('\n'))}</textarea>
+      <label>trigger</label>
+      <input id="e-trig" value="${esc(e.trigger||'')}" placeholder="leave blank until you know">
+      <label>&nbsp;</label>
+      <button class="btn" id="e-flip">reverse direction</button>`;
+    $('#e-from').value=e.from; $('#e-to').value=e.to;
+    const apply=()=>{e.label=$('#e-label').value;e.arrow=$('#e-arrow').value;
+      e.from=$('#e-from').value;e.to=$('#e-to').value;
+      e.requires=$('#e-req').value.split('\n').map(x=>x.trim()).filter(Boolean);
+      e.trigger=$('#e-trig').value.trim()||null;push();showSel();};
+    ['e-label','e-arrow','e-from','e-to','e-trig','e-req'].forEach(id=>{
+      const e2=$('#'+id); e2.onchange=apply;
+      e2.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();apply();}};
+    });
+    $('#e-flip').onclick=()=>{const t=e.from;e.from=e.to;e.to=t;push();showSel();};
   }
 }
 
-// ---- walk + dreams
-$('#startbtn').onclick = () => {
-  walk = new Walk(graph, $('#startsel').value);
-  renderWalk(); draw();
-};
-function renderWalk() {
-  const el = $('#walkui');
-  if (!walk) { el.innerHTML = ''; return; }
-  const r = $('#radius').value === 'null' ? null : Number($('#radius').value);
-  const opts = walk.options();
-  const d = dream(graph, walk, { radius: r, count: 5, seed: walk.path.length * 7919 });
-  el.innerHTML =
-    `<label>path</label><div class="hint">${walk.path.map(esc).join(' → ')}</div>
-     <label>here: ${esc(graph.nodes.find((n) => n.id === walk.current)?.title || '')}</label>
-     ${opts.length ? '' : '<div class="warn">no way on — dead end. the loop is broken here.</div>'}
-     ${opts.map((o, i) => `<button class="opt" data-go="${esc(o.to)}">${esc(o.edge.label || o.to)}
-        ${o.edge.locks ? '<span class="warn">· locks behind</span>' : ''}</button>`).join('')}
-     <label>dream</label>
-     ${d.length ? d.map((f) => `<div class="frag ${f.seen ? 'seen' : ''}">${esc(f.frag)}</div>`).join('')
-                : '<div class="hint">nothing left to dream — everywhere is visited.</div>'}`;
-  el.querySelectorAll('[data-go]').forEach((b) => {
-    b.onclick = () => { walk.step(b.dataset.go); renderWalk(); draw(); };
+/* ================= story view ================= */
+let mode='graph';
+function setMode(m){
+  mode=m;
+  $('#main').className = m==='split'?'split' : m==='story'?'storyonly' : '';
+  ['graph','split','story'].forEach(k=>
+    $('#v-'+k).classList.toggle('ghost',k!==m));
+  localStorage.setItem('loom.mode',m);
+  if(m!=='graph') renderStoryView(); else draw();
+}
+['graph','split','story'].forEach(k=>{
+  const b=$('#v-'+k); if(b) b.onclick=()=>setMode(k);
+});
+
+function renderStoryView(){
+  const el=$('#story'); if(!el||mode==='graph') return;
+  if(!graph.nodes.length){ el.innerHTML='<div class="stub">nothing to read yet</div>'; return; }
+
+  const blocks=renderStory(graph, walk, {radius:1});
+  if(!walk){
+    el.innerHTML='<div class="stub">Reading every node in declaration order.<br>'+
+      'Start a <b>walk</b> to read it as a path &mdash; what you read then depends<br>'+
+      'on how you travelled.</div>'+blocksToHtml(blocks);
+  } else {
+    el.innerHTML=blocksToHtml(blocks);
+  }
+  el.querySelectorAll('[data-node]').forEach(d=>{
+    d.onclick=()=>{ sel={kind:'node',id:d.dataset.node}; draw(); showSel(); tab('sel');
+      el.querySelectorAll('.sn').forEach(x=>x.classList.remove('on'));
+      d.classList.add('on'); };
   });
 }
-$('#radius').onchange = renderWalk;
 
-// ---- tabs / export
-document.querySelectorAll('.tabs button').forEach((b) => {
-  b.onclick = () => {
-    document.querySelectorAll('.tabs button').forEach((x) => x.classList.remove('on'));
-    document.querySelectorAll('.pane').forEach((x) => x.classList.remove('on'));
-    b.classList.add('on'); $('#p-' + b.dataset.t).classList.add('on');
+function blocksToHtml(blocks){
+  return blocks.map(b=>{
+    if(b.kind==='node'){
+      const col=COL(b.type);
+      return `<div class="sn" data-node="${esc(b.id)}" style="border-left-color:${col}">
+        <h4 style="color:${col}">${esc(b.title)}</h4>
+        ${b.body?`<div class="ref">${esc(b.body)}</div>`:''}
+        ${b.frags.map(f=>`<p>${esc(f)}</p>`).join('')}
+        ${b.empty?'<p class="mt">[undescribed &mdash; the structure needs something here]</p>':''}
+      </div>`;
+    }
+    if(b.kind==='action'){
+      return `<div class="act">${esc(b.text)}
+        ${b.locks?'<b>&nbsp;locks behind</b>':''}
+        ${b.requires.length?`<br><b>requires:</b> ${b.requires.map(esc).join(' &middot; ')}`:''}
+      </div>`;
+    }
+    if(b.kind==='dream'&&b.frags.length){
+      return `<div class="drm">${b.frags.map(esc).join('<br>')}</div>`;
+    }
+    return '';
+  }).join('');
+}
+
+/* ================= lexicon ================= */
+function renderLex(){
+  const el=$('#p-lex'); if(!el) return;
+  const rep=lexiconReport(graph);
+  const empt=emptyNodes(graph);
+  const open=openRequirements(graph);
+
+  el.innerHTML=`
+    <div class="hint">Write <code>{{name}}</code> anywhere. Bind it late.
+      Change it once, it changes everywhere. Unbound is not an error.</div>
+    <label>variables</label>
+    <div id="lexlist"></div>
+    <label>add</label>
+    <div class="row">
+      <input id="lex-new" placeholder="name" style="flex:1">
+      <button class="btn" id="lex-add" style="flex:0 0 auto">+</button>
+    </div>
+    <label>undescribed nodes &mdash; ${empt.length}</label>
+    <div class="hint">Real in the graph. Not yet decided.</div>
+    <div id="emptylist"></div>
+    ${open.length?`<label>open requirements &mdash; ${open.length}</label>
+      <div class="hint">What the structure demands of things you haven't written.</div>
+      <div id="reqlist"></div>`:''}`;
+
+  const ll=$('#lexlist');
+  ll.innerHTML = rep.length?'':'<div class="hint">none yet</div>';
+  rep.forEach(v=>{
+    const d=document.createElement('div');
+    d.style.margin='6px 0';
+    d.innerHTML=`<div style="display:flex;gap:6px;align-items:center">
+        <span class="chip" style="flex:0 0 auto;${v.bound?'':'color:var(--warn)'}">{{${esc(v.name)}}}</span>
+        <input data-var="${esc(v.name)}" value="${esc(v.value)}"
+          placeholder="unbound" style="flex:1">
+      </div>
+      <div class="hint" style="margin:2px 0 0">${v.uses.length} use${v.uses.length===1?'':'s'}${
+        v.uses.length?' &middot; '+esc(v.uses.slice(0,3).join(', ')):''}</div>`;
+    ll.appendChild(d);
+  });
+  ll.querySelectorAll('[data-var]').forEach(inp=>{
+    const commit=()=>{ graph.lexicon=graph.lexicon||{};
+      graph.lexicon[inp.dataset.var]=inp.value; push(); tab('lex'); };
+    inp.onchange=commit;
+    inp.onkeydown=e=>{ if(e.key==='Enter'){e.preventDefault();commit();} };
+  });
+  $('#lex-add').onclick=()=>{
+    const n=$('#lex-new').value.trim().replace(/[^A-Za-z0-9_]/g,'_');
+    if(!n) return;
+    graph.lexicon=graph.lexicon||{}; graph.lexicon[n]=''; push(); tab('lex');
   };
-});
-document.querySelectorAll('[data-x]').forEach((b) => {
-  b.onclick = () => {
-    const g = graph;
-    const start = graph.nodes[0]?.id;
-    const map = { json: () => toJSON(g), twee: () => toTwee(g, { start }),
-                  cypher: () => toCypher(g), loom: () => serialise(g) };
-    $('#outbox').value = map[b.dataset.x]();
-  };
+
+  const el2=$('#emptylist');
+  el2.innerHTML = empt.length?'':'<div class="hint">none</div>';
+  empt.forEach(n=>{
+    const b=document.createElement('button'); b.className='opt';
+    const reqs=requirementsOn(graph,n.id);
+    b.innerHTML=`<b>${esc(n.id)}</b>${reqs.length?`<br><span style="color:var(--warn)">
+      ${reqs.map(r=>esc(X(r.req))).join('<br>')}</span>`:''}`;
+    b.onclick=()=>{sel={kind:'node',id:n.id};draw();showSel();tab('sel');};
+    el2.appendChild(b);
+  });
+
+  const rl=$('#reqlist');
+  if(rl){ open.forEach(r=>{
+    const d=document.createElement('div'); d.className='frag';
+    d.style.borderLeftColor='var(--warn)';
+    d.innerHTML=`<b>${esc(r.node)}</b> &larr; ${esc(X(r.req))}`;
+    rl.appendChild(d);
+  }); }
+}
+
+/* ================= walk ================= */
+function renderWalk(){
+  const el=$('#p-walk');
+  if(!walk){
+    el.innerHTML=`<label>start from</label>
+      <select id="startsel">${graph.nodes.map(n=>`<option value="${esc(n.id)}">${esc(n.title)}</option>`).join('')}</select>
+      <label>dream radius</label>
+      <select id="radius">
+        <option value="1">1 &mdash; a guide (next door)</option>
+        <option value="2">2 &mdash; nearby</option>
+        <option value="null">infinite &mdash; a haunting</option>
+      </select>
+      <label>&nbsp;</label>
+      <button class="btn" id="startbtn" style="width:100%;justify-content:center">begin walk</button>
+      <div class="hint">One-way doors burn behind you. Dreams pull fragments from
+      where you haven't been.</div>`;
+    $('#startbtn').onclick=()=>{walk=new Walk(graph,$('#startsel').value);renderWalk();draw();renderStoryView();};
+    return;
+  }
+  const rv=$('#radius')?.value??'1';
+  const r=rv==='null'?null:Number(rv);
+  const opts=walk.options();
+  const d=dream(graph,walk,{radius:r,count:5,seed:walk.path.length*7919});
+  el.innerHTML=`
+    <div class="row"><button class="btn" id="w-end" style="flex:0 0 auto">end walk</button>
+      <span class="hint" style="margin:0;align-self:center">${walk.path.length} steps</span></div>
+    <label>path</label><div class="hint">${walk.path.map(esc).join(' &rarr; ')}</div>
+    <label>here &mdash; ${esc(graph.nodes.find(n=>n.id===walk.current)?.title||'')}</label>
+    ${opts.length?'':'<div class="warn">no way on. the loop is broken here.</div>'}
+    ${opts.map(o=>`<button class="opt" data-go="${esc(o.to)}">${esc(o.edge.label||o.to)}
+      ${o.edge.locks?'<span class="warn"> &middot; locks behind</span>':''}</button>`).join('')}
+    <label>dream</label>
+    ${d.length?d.map(f=>`<div class="frag ${f.seen?'seen':''}">${esc(f.frag)}</div>`).join('')
+      :'<div class="hint">nothing left to dream.</div>'}`;
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{walk.step(b.dataset.go);renderWalk();draw();renderStoryView();});
+  $('#w-end').onclick=()=>{walk=null;renderWalk();draw();renderStoryView();};
+}
+
+/* ================= export ================= */
+document.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>{
+  const start=graph.nodes[0]?.id;
+  const m={json:()=>toJSON(graph),twee:()=>toTwee(graph,{start}),
+           cypher:()=>toCypher(graph),loom:()=>serialise(graph),
+           story:()=>storyToText(renderStory(graph,walk,{radius:1}))};
+  $('#outbox').value=m[b.dataset.x]();
 });
 
-// ---- boot
-$('#src').value = localStorage.getItem('loom.src') || SAMPLE;
-$('#src').addEventListener('input', () => {
-  localStorage.setItem('loom.src', $('#src').value);
-  reparse();
-});
+/* ================= skin ================= */
+(function(){
+  const sel2=$('#palsel');
+  Object.entries(PALETTES).forEach(([k,p])=>sel2.add(new Option(p.label,k)));
+  sel2.onchange=()=>{ applyPalette(sel2.value);
+    graph.meta=graph.meta||{}; graph.meta.palette=sel2.value; push(); };
+})();
+
+/* ================= boot ================= */
+$('#src').value=localStorage.getItem('loom.src')||SAMPLE;
+try{ pos=JSON.parse(localStorage.getItem('loom.pos')||'{}'); }catch{ pos={}; }
+try{ fold=JSON.parse(localStorage.getItem('loom.fold')||'{}'); }catch{ fold={}; }
+applyPalette(localStorage.getItem('loom.palette')||'neon');
 reparse();
+if(graph.meta?.palette&&PALETTES[graph.meta.palette]){
+  applyPalette(graph.meta.palette); $('#palsel').value=graph.meta.palette;
+} else { $('#palsel').value=palette; }
+setMode(localStorage.getItem('loom.mode')||'graph');
 </script>
 </body>
 </html>

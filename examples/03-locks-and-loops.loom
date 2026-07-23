@@ -1,0 +1,33 @@
+# ONE WAY THROUGH
+#
+# SHOWS: the difference between -> and =>, and why "no end, always a loop"
+# is a rule worth checking.
+#
+# Walk this from `arrive`. Take the => edge and watch three nodes go dark
+# behind you. You can still get home — but not the way you came.
+#
+# Try deleting the `escape -> arrive` edge and watch the status bar complain.
+
+palette ember
+
+node arrive   "The Entrance"   type:location frag:"a door that opens inward"
+node atrium   "The Atrium"     type:location frag:"light from somewhere above"
+node archive  "The Archive"    type:location frag:"paper going the colour of weak tea"
+node vault    "The Vault"      type:location frag:"no handle on this side"
+node stair    "The Back Stair" type:location frag:"dust undisturbed"
+node escape   "The Loading Bay" type:location frag:"cold air, and the street"
+
+# freely walkable
+arrive  <> atrium  : step through
+atrium  <> archive : browse
+
+# the point of no return
+archive => vault   : take the ledger down with you
+
+# from the vault there is only forward
+vault   -> stair   : find the other way out
+stair   -> escape  : down, and down
+escape  -> arrive  : around the outside, and in again
+
+# a shortcut that exists but costs you the archive
+atrium  => stair   : slip past the desk

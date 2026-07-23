@@ -1,0 +1,32 @@
+# WHAT YOU HAVEN'T SEEN YET
+#
+# SHOWS: dreams as a navigation layer. Fragments are pulled from the places
+# you have NOT been and shown out of context. The reader thinks they are
+# dreaming. They are being navigated.
+#
+# Walk from `waking`. Take one branch. The dream tells you about the other.
+# Set radius to infinite for a haunting instead of a guide.
+#
+# Grey fragments are places you've been. Coloured ones are places you haven't.
+
+palette mono
+
+node waking  "Waking"     type:scene  frag:"the ceiling, familiar"
+node kitchen "The Kitchen" type:location
+     frag:"a cup left out overnight" frag:"the tap, dripping"
+node garden  "The Garden"  type:location
+     frag:"something has been digging" frag:"rain on the way"
+node cellar  "The Cellar"  type:location
+     frag:"a light that was already on" frag:"boxes with someone else's writing"
+node attic   "The Attic"   type:location
+     frag:"a chair facing the wrong way" frag:"birds, or not birds"
+node sleep   "Sleep"      type:dream
+     frag:"none of the doors were where you left them"
+
+waking  -> kitchen : go down
+waking  -> garden  : go out
+kitchen -> cellar  : the door under the stairs
+garden  -> attic   : the ladder outside, which makes no sense
+cellar  -> sleep   : sit down for a moment
+attic   -> sleep   : sit down for a moment
+sleep   -> waking  : and again

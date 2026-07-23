@@ -1,0 +1,39 @@
+# THE SAME SHAPE, DIFFERENT CONTENT
+#
+# SHOWS: the lexicon. Every name in this graph is a variable. Nothing is
+# hard-coded. Open the lexicon tab and change {{who}} — watch it propagate
+# through titles, fragments, actions and requirements at once.
+#
+# This is what makes a template: identical topology, bound differently.
+# Bind them one way and it's a heist. Bind them another and it's a wedding.
+#
+# Try: who=Borlu, opposite=his brother, thing=the red pen, place=the bright room
+# Then:  who=Ellis, opposite=the auditor, thing=the ledger, place=the archive
+
+palette paper
+
+let who      = someone
+let opposite = someone else
+let thing    = the object
+let place    = the room
+let cost     =
+
+node start   "{{who}} arrives at {{place}}" type:scene
+     frag:"{{who}}, early, as always"
+     frag:"{{place}}, exactly as described"
+
+node other   "{{opposite}}"                 type:character
+     frag:"{{opposite}} was already there"
+
+node object  "{{thing}}"                    type:object
+     frag:"{{thing}}, between them, untouched"
+
+node after   "After"                        type:scene
+     frag:"{{who}} leaves without {{thing}}"
+
+start -> other  : recognise {{opposite}}
+other -> object : reach for {{thing}} at the same moment
+     ! must not be spoken about
+     ! must cost {{cost}}
+object -> after : let {{opposite}} take it
+after -> start  : and again, differently
