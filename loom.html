@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>loom</title>
+<style>
+  :root{
+    --bg:#0a0a0f; --panel:#12121a; --line:#2a2a38; --ink:#e8e8f0;
+    --dim:#6a6a80; --hot:#ff2f92; --cool:#00e0d0; --warn:#ffb020;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:14px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+  #app{display:grid;grid-template-columns:1fr 380px;height:100%}
+  #canvaswrap{position:relative;overflow:hidden}
+  svg{width:100%;height:100%;display:block;cursor:grab}
+  svg.panning{cursor:grabbing}
+  .node rect{fill:var(--panel);stroke:var(--line);stroke-width:2;rx:6}
+  .node.sel rect{stroke:var(--hot);stroke-width:3}
+  .node.visited rect{stroke:var(--cool)}
+  .node.here rect{fill:#1d1d2a;stroke:var(--hot);stroke-width:3}
+  .node text{fill:var(--ink);font-size:13px;pointer-events:none;user-select:none}
+  .node .sub{fill:var(--dim);font-size:10px}
+  .edge{stroke:var(--line);stroke-width:2;fill:none;marker-end:url(#arrow)}
+  .edge.locks{stroke:var(--warn);stroke-dasharray:6 4;marker-end:url(#arrowW)}
+  .edge.both{marker-start:url(#arrow)}
+  .edge.sel{stroke:var(--hot);marker-end:url(#arrowH)}
+  .edge.burned{stroke:#3a1a1a;stroke-dasharray:2 6}
+  .elabel{fill:var(--dim);font-size:10px;pointer-events:none;user-select:none}
+  #side{background:var(--panel);border-left:1px solid var(--line);
+    display:flex;flex-direction:column;overflow:hidden}
+  .tabs{display:flex;border-bottom:1px solid var(--line);flex:0 0 auto}
+  .tabs button{flex:1;background:none;border:0;color:var(--dim);padding:10px;
+    cursor:pointer;font:inherit;border-bottom:2px solid transparent}
+  .tabs button.on{color:var(--ink);border-bottom-color:var(--hot)}
+  .pane{display:none;padding:12px;overflow:auto;flex:1 1 auto}
+  .pane.on{display:block}
+  textarea{width:100%;height:100%;min-height:400px;background:#0d0d14;color:var(--ink);
+    border:1px solid var(--line);border-radius:4px;padding:10px;
+    font:12px/1.6 ui-monospace,monospace;resize:none}
+  label{display:block;color:var(--dim);font-size:11px;margin:10px 0 3px}
+  input,select{width:100%;background:#0d0d14;color:var(--ink);border:1px solid var(--line);
+    border-radius:4px;padding:7px;font:inherit}
+  button.act{background:#1d1d2a;color:var(--ink);border:1px solid var(--line);
+    border-radius:4px;padding:8px 10px;cursor:pointer;font:inherit;margin:4px 4px 0 0}
+  button.act:hover{border-color:var(--hot)}
+  .hint{color:var(--dim);font-size:11px;margin:8px 0}
+  .frag{background:#0d0d14;border-left:2px solid var(--cool);padding:6px 8px;margin:6px 0;
+    font-size:12px}
+  .frag.seen{border-left-color:var(--line);color:var(--dim)}
+  .opt{display:block;width:100%;text-align:left;background:#0d0d14;color:var(--ink);
+    border:1px solid var(--line);border-radius:4px;padding:8px;margin:4px 0;cursor:pointer;
+    font:inherit}
+  .opt:hover{border-color:var(--hot)}
+  .warn{color:var(--warn);font-size:11px}
+  .ok{color:var(--cool);font-size:11px}
+  #status{position:absolute;left:10px;bottom:10px;color:var(--dim);font-size:11px}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="canvaswrap">
+    <svg id="svg">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+          markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#2a2a38"/></marker>
+        <marker id="arrowH" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+          markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#ff2f92"/></marker>
+        <marker id="arrowW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
+          markerHeight="6" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" fill="#ffb020"/></marker>
+      </defs>
+      <g id="view">
+        <g id="edges"></g>
+        <g id="nodes"></g>
+      </g>
+    </svg>
+    <div id="status"></div>
+  </div>
+
+  <div id="side">
+    <div class="tabs">
+      <button data-t="src" class="on">source</button>
+      <button data-t="sel">selected</button>
+      <button data-t="walk">walk</button>
+      <button data-t="out">export</button>
+    </div>
+
+    <div class="pane on" id="p-src">
+      <div class="hint">
+        Source of truth. Type fast; the canvas follows.<br>
+        <b>node</b> id "Title" content:path frag:"image"<br>
+        <b>-&gt;</b> retraversable &nbsp; <b>=&gt;</b> locks behind &nbsp; <b>&lt;&gt;</b> both ways<br>
+        text after <b>:</b> is the edge label — the action.
+      </div>
+      <textarea id="src" spellcheck="false"></textarea>
+    </div>
+
+    <div class="pane" id="p-sel"><div class="hint">Click a node or edge.</div></div>
+
+    <div class="pane" id="p-walk">
+      <div class="hint">Walk the graph. One-way doors burn behind you.
+        Dreams pull fragments from where you haven't been.</div>
+      <label>start</label><select id="startsel"></select>
+      <button class="act" id="startbtn">begin walk</button>
+      <label>dream radius</label>
+      <select id="radius">
+        <option value="1">1 — a guide (next door)</option>
+        <option value="2">2 — nearby</option>
+        <option value="null">∞ — a haunting (anywhere)</option>
+      </select>
+      <div id="walkui"></div>
+    </div>
+
+    <div class="pane" id="p-out">
+      <button class="act" data-x="json">JSON</button>
+      <button class="act" data-x="twee">Twee (Twine)</button>
+      <button class="act" data-x="cypher">Cypher (neo4j)</button>
+      <button class="act" data-x="loom">.loom source</button>
+      <div class="hint">Nodes hold a <i>reference</i> to content, never the content.
+        That's what lets the same graph render as a page, a door game, or a book.</div>
+      <textarea id="outbox" spellcheck="false"></textarea>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { parse, serialise, Walk, dream, findDeadEnds, findNonReturning,
+         toJSON, toTwee, toCypher, neighbours } from './src/loom.js';
+
+const SAMPLE = `# the brother and the brother
+# the door is the only node both men pass through.
+
+node door  "The Door"        content:scenes/door.md  frag:"a door closing" frag:"the dim hallway"
+node table "The Bright Room" content:scenes/table.md frag:"the hum of the lights" frag:"a pale folder" frag:"very bright"
+node red   "The Red Pen"     content:scenes/red.md   frag:"corrections in red"
+node badge "The Name Badge"  content:scenes/badge.md frag:"a name that is not his"
+node hall  "The Hallway"     content:scenes/hall.md  frag:"dimly lit"
+
+door  <> table : walk in
+table -> red   : pick up the pen
+table -> badge : take the badge
+red   -> table : keep working
+badge => hall  : leave wearing it
+hall  -> door  : the loop closes
+`;
+
+const $ = (s) => document.querySelector(s);
+const svg = $('#svg'), gEdges = $('#edges'), gNodes = $('#nodes'), gView = $('#view');
+let graph = { nodes: [], edges: [], errors: [] };
+let pos = {};            // id -> {x,y}
+let sel = null;          // {kind:'node'|'edge', ...}
+let walk = null;
+let view = { x: 0, y: 0, k: 1 };
+
+// ---- layout: keep positions across reparses, seed new nodes on a spiral
+function layout() {
+  let i = 0;
+  graph.nodes.forEach((n) => {
+    if (!pos[n.id]) {
+      const a = i * 2.399, r = 90 * Math.sqrt(i + 1);
+      pos[n.id] = { x: 420 + r * Math.cos(a), y: 300 + r * Math.sin(a) };
+    }
+    i++;
+  });
+}
+
+function reparse() {
+  graph = parse($('#src').value);
+  layout();
+  draw();
+  const de = findDeadEnds(graph);
+  const nr = graph.nodes.length ? findNonReturning(graph, graph.nodes[0].id) : [];
+  const bits = [`${graph.nodes.length} nodes · ${graph.edges.length} edges`];
+  if (graph.errors.length) bits.push(`${graph.errors.length} unparsed`);
+  if (de.length) bits.push(`dead end: ${de.join(', ')}`);
+  if (nr.length) bits.push(`cannot return: ${nr.join(', ')}`);
+  $('#status').textContent = bits.join('  ·  ');
+  const s = $('#startsel'); s.innerHTML = '';
+  graph.nodes.forEach((n) => s.add(new Option(n.title, n.id)));
+}
+
+const NW = 150, NH = 46;
+function draw() {
+  gView.setAttribute('transform', `translate(${view.x},${view.y}) scale(${view.k})`);
+  gEdges.innerHTML = ''; gNodes.innerHTML = '';
+
+  graph.edges.forEach((e, idx) => {
+    const a = pos[e.from], b = pos[e.to];
+    if (!a || !b) return;
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L, pad = 78;
+    const x1 = a.x + ux * pad, y1 = a.y + uy * pad;
+    const x2 = b.x - ux * pad, y2 = b.y - uy * pad;
+    const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    const mx = (x1 + x2) / 2 - uy * 26, my = (y1 + y2) / 2 + ux * 26;
+    p.setAttribute('d', `M${x1},${y1} Q${mx},${my} ${x2},${y2}`);
+    let cls = 'edge' + (e.locks ? ' locks' : '') + (!e.directed ? ' both' : '');
+    if (sel?.kind === 'edge' && sel.idx === idx) cls += ' sel';
+    if (walk?.burned.has(`${e.from}|${e.to}|${e.arrow}`)) cls += ' burned';
+    p.setAttribute('class', cls);
+    p.style.pointerEvents = 'stroke';
+    p.style.cursor = 'pointer';
+    p.onclick = (ev) => { ev.stopPropagation(); sel = { kind: 'edge', idx }; draw(); showSel(); };
+    gEdges.appendChild(p);
+    if (e.label) {
+      const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t.setAttribute('x', mx); t.setAttribute('y', my); t.setAttribute('class', 'elabel');
+      t.setAttribute('text-anchor', 'middle'); t.textContent = e.label;
+      gEdges.appendChild(t);
+    }
+  });
+
+  graph.nodes.forEach((n) => {
+    const p = pos[n.id];
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    let cls = 'node';
+    if (sel?.kind === 'node' && sel.id === n.id) cls += ' sel';
+    if (walk?.visited.has(n.id)) cls += ' visited';
+    if (walk?.current === n.id) cls += ' here';
+    g.setAttribute('class', cls);
+    g.setAttribute('transform', `translate(${p.x - NW / 2},${p.y - NH / 2})`);
+    g.innerHTML =
+      `<rect width="${NW}" height="${NH}"></rect>` +
+      `<text x="10" y="19">${esc(n.title).slice(0, 20)}</text>` +
+      `<text x="10" y="34" class="sub">${n.frags.length} frag · ${esc(n.id)}</text>`;
+    g.style.cursor = 'move';
+    g.onpointerdown = (ev) => startDrag(ev, n.id);
+    g.onclick = (ev) => { ev.stopPropagation(); sel = { kind: 'node', id: n.id }; draw(); showSel(); };
+    gNodes.appendChild(g);
+  });
+}
+const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]));
+
+// ---- drag nodes / pan / zoom
+let drag = null;
+function startDrag(ev, id) {
+  ev.stopPropagation();
+  drag = { id, sx: ev.clientX, sy: ev.clientY, ox: pos[id].x, oy: pos[id].y };
+  svg.setPointerCapture(ev.pointerId);
+}
+svg.addEventListener('pointermove', (ev) => {
+  if (drag) {
+    pos[drag.id].x = drag.ox + (ev.clientX - drag.sx) / view.k;
+    pos[drag.id].y = drag.oy + (ev.clientY - drag.sy) / view.k;
+    draw();
+  } else if (pan) {
+    view.x = pan.ox + (ev.clientX - pan.sx);
+    view.y = pan.oy + (ev.clientY - pan.sy);
+    draw();
+  }
+});
+svg.addEventListener('pointerup', () => { drag = null; pan = null; svg.classList.remove('panning'); });
+let pan = null;
+svg.addEventListener('pointerdown', (ev) => {
+  if (ev.target.closest('.node') || ev.target.closest('.edge')) return;
+  pan = { sx: ev.clientX, sy: ev.clientY, ox: view.x, oy: view.y };
+  svg.classList.add('panning');
+  sel = null; draw(); showSel();
+});
+svg.addEventListener('wheel', (ev) => {
+  ev.preventDefault();
+  const f = ev.deltaY < 0 ? 1.1 : 0.9;
+  view.k = Math.max(0.25, Math.min(3, view.k * f));
+  draw();
+}, { passive: false });
+
+// ---- selected pane
+function showSel() {
+  const el = $('#p-sel');
+  if (!sel) { el.innerHTML = '<div class="hint">Click a node or edge.</div>'; return; }
+  if (sel.kind === 'node') {
+    const n = graph.nodes.find((x) => x.id === sel.id);
+    if (!n) return;
+    el.innerHTML =
+      `<label>id</label><input value="${esc(n.id)}" disabled>
+       <label>title</label><input id="f-title" value="${esc(n.title)}">
+       <label>content reference</label><input id="f-content" value="${esc(n.content || '')}"
+         placeholder="scenes/door.md — a pointer, not the prose">
+       <label>dream fragments (one per line)</label>
+       <textarea id="f-frags" style="min-height:120px">${n.frags.map(esc).join('\n')}</textarea>
+       <button class="act" id="f-apply">apply to source</button>`;
+    $('#f-apply').onclick = () => {
+      n.title = $('#f-title').value;
+      n.content = $('#f-content').value || null;
+      n.frags = $('#f-frags').value.split('\n').map((s) => s.trim()).filter(Boolean);
+      $('#src').value = serialise(graph);
+      reparse(); showSel();
+    };
+  } else {
+    const e = graph.edges[sel.idx];
+    el.innerHTML =
+      `<label>edge</label><input value="${esc(e.from)} ${e.arrow} ${esc(e.to)}" disabled>
+       <label>action (the label)</label><input id="e-label" value="${esc(e.label)}">
+       <label>kind</label>
+       <select id="e-arrow">
+         <option value="->" ${e.arrow === '->' ? 'selected' : ''}>-&gt; retraversable</option>
+         <option value="=>" ${e.arrow === '=>' ? 'selected' : ''}>=&gt; locks behind you</option>
+         <option value="<>" ${e.arrow === '<>' ? 'selected' : ''}>&lt;&gt; both ways</option>
+       </select>
+       <label>trigger <span class="hint">(leave blank until you know)</span></label>
+       <input id="e-trig" value="${esc(e.trigger || '')}">
+       <button class="act" id="e-apply">apply to source</button>`;
+    $('#e-apply').onclick = () => {
+      e.label = $('#e-label').value;
+      e.arrow = $('#e-arrow').value;
+      $('#src').value = serialise(graph);
+      reparse(); showSel();
+    };
+  }
+}
+
+// ---- walk + dreams
+$('#startbtn').onclick = () => {
+  walk = new Walk(graph, $('#startsel').value);
+  renderWalk(); draw();
+};
+function renderWalk() {
+  const el = $('#walkui');
+  if (!walk) { el.innerHTML = ''; return; }
+  const r = $('#radius').value === 'null' ? null : Number($('#radius').value);
+  const opts = walk.options();
+  const d = dream(graph, walk, { radius: r, count: 5, seed: walk.path.length * 7919 });
+  el.innerHTML =
+    `<label>path</label><div class="hint">${walk.path.map(esc).join(' → ')}</div>
+     <label>here: ${esc(graph.nodes.find((n) => n.id === walk.current)?.title || '')}</label>
+     ${opts.length ? '' : '<div class="warn">no way on — dead end. the loop is broken here.</div>'}
+     ${opts.map((o, i) => `<button class="opt" data-go="${esc(o.to)}">${esc(o.edge.label || o.to)}
+        ${o.edge.locks ? '<span class="warn">· locks behind</span>' : ''}</button>`).join('')}
+     <label>dream</label>
+     ${d.length ? d.map((f) => `<div class="frag ${f.seen ? 'seen' : ''}">${esc(f.frag)}</div>`).join('')
+                : '<div class="hint">nothing left to dream — everywhere is visited.</div>'}`;
+  el.querySelectorAll('[data-go]').forEach((b) => {
+    b.onclick = () => { walk.step(b.dataset.go); renderWalk(); draw(); };
+  });
+}
+$('#radius').onchange = renderWalk;
+
+// ---- tabs / export
+document.querySelectorAll('.tabs button').forEach((b) => {
+  b.onclick = () => {
+    document.querySelectorAll('.tabs button').forEach((x) => x.classList.remove('on'));
+    document.querySelectorAll('.pane').forEach((x) => x.classList.remove('on'));
+    b.classList.add('on'); $('#p-' + b.dataset.t).classList.add('on');
+  };
+});
+document.querySelectorAll('[data-x]').forEach((b) => {
+  b.onclick = () => {
+    const g = graph;
+    const start = graph.nodes[0]?.id;
+    const map = { json: () => toJSON(g), twee: () => toTwee(g, { start }),
+                  cypher: () => toCypher(g), loom: () => serialise(g) };
+    $('#outbox').value = map[b.dataset.x]();
+  };
+});
+
+// ---- boot
+$('#src').value = localStorage.getItem('loom.src') || SAMPLE;
+$('#src').addEventListener('input', () => {
+  localStorage.setItem('loom.src', $('#src').value);
+  reparse();
+});
+reparse();
+</script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "loom",
+  "version": "0.1.0",
+  "description": "A graph editor for narratives that loop. Nodes are prose, edges are actions.",
+  "type": "module",
+  "main": "src/loom.js",
+  "scripts": {
+    "start": "python3 -m http.server 8000",
+    "test": "node test/run.mjs"
+  },
+  "license": "MIT",
+  "keywords": ["interactive-fiction","narrative","graph","twine","hypertext"]
+}
